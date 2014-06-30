@@ -8,17 +8,29 @@ include("misc.lua");
 local MsgC = MsgC;
 local type = type;
 
+--[[ 
+	Make it available Server-side
+	
+								]]
+local function GetTextSize(x)
+	if(SERVER) then
+		return string.len(x) * 12;
+	else
+		return surface.GetTextSize(x);
+	end
+end
+
 --[[
 	Do not mess with it unless you know what you are doing!
 																]]
 
 local function FixTabs(x, width)
-	local curw = surface.GetTextSize(x);
+	local curw = GetTextSize(x);
 	local ret = "";
 	while(curw < width) do
 		x 		= x.." ";
 		ret 	= ret.." ";
-		curw 	= surface.GetTextSize(x);
+		curw 	= GetTextSize(x)
 	end
 	return ret
 end
@@ -32,11 +44,13 @@ local mac	= system.IsOSX();
 local win	= system.IsWindows();
 
 
-surface.CreateFont("ConsoleText", {
-	font	= ((linux or mac) and "Verdana" or "Lucida Console");
-	size	= (mac and 11 or linux and 14 or 10);
-	weight	= 500;
-});
+if(CLIENT) then
+	surface.CreateFont("ConsoleText", {
+		font	= ((linux or mac) and "Verdana" or "Lucida Console");
+		size	= (mac and 11 or linux and 14 or 10);
+		weight	= 500;
+	});
+end
 
 --[[
 	Editable Variables:
@@ -64,7 +78,7 @@ local function DebugFixToString(a)
 	elseif(_t == "Angle") then
 		return "Angle("..tostring(a.p)..", "..tostring(a.y)..", "..tostirng(a.r)..")";
 	elseif(_t == "table" and IsColor(a)) then
-		return "Color("..tostring(a.r)..", "..tostring(a.g)..", "..tostring(a.b)..", "..tostring(a.a)..")¦";
+		return "Color("..tostring(a.r)..", "..tostring(a.g)..", "..tostring(a.b)..", "..tostring(a.a)..")ï¿½";
 	elseif(_t == "Player") then
 		return "player.GetByID("..a:EntIndex()..") ["..(a.Nick and a:Nick() or "missing_nick").."]";
 	elseif(_t == "Entity" or regs and regs[_t] and regs[_t].MetaBaseClass and regs[_t].MetaBaseClass.MetaName == "Entity") then
@@ -90,7 +104,7 @@ local function DebugFixToStringColored(a)
 	elseif(_t == "table" and IsColor(a)) then
 		return typecol.func, "Color", typecol.etc, "(", typecol.number, tostring(a.r), typecol.etc, ", ", typecol.number,
 			tostring(a.g), typecol.etc, ", ", typecol.number, tostring(a.b), typecol.etc, ", ", typecol.number, 
-				tostring(a.a), typecol.etc, ")", a, "¦";
+				tostring(a.a), typecol.etc, ")", a, "ï¿½";
 	elseif(_t == "Player") then
 		return typecol.func, "player.GetByID", typecol.etc, "(", typecol.number, tostring(a:EntIndex()), typecol.etc,
 			")", typecol.unk, "["..(a.Nick and a:Nick() or "missing_nick").."]";
@@ -118,11 +132,13 @@ function DebugPrintTable(tbl, ind, done)
 	local ws = {};
 	local ind = ind or 0;
 	local done = done or {[tbl] = true};
-	surface.SetFont("ConsoleText");
+	if(CLIENT) then
+		surface.SetFont("ConsoleText");
+	end
 	for k,v in pairs(tbl) do
 		rbuf[#rbuf + 1]  = k;
 		buffer[#buffer + 1] = "["..DebugFixToString(k).."] ";
-		ws[#buffer] = surface.GetTextSize(buffer[#buffer]);
+		ws[#buffer] = GetTextSize(buffer[#buffer]);
 		mw = math.max(ws[#buffer], mw);
 	end
 	local str = "";
