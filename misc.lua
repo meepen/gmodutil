@@ -13,7 +13,6 @@ function IsColor(col)
 	end
 	for k,v in pairs(col) do
 		if(k == 'r' or k == 'g' or k == 'b' or k == 'a') then continue; end
-		print("not");
 		return false;
 	end
 	return true;
