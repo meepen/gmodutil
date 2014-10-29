@@ -60,63 +60,61 @@ end
 																]]
 
 local typecol = {
-	["function"]	= Color(0,	 150, 192);
+	["function"]	= Color(000, 150, 192);
 	["number"] 		= Color(244, 146, 102);
 	["string"] 		= Color(128, 128, 128);
-	["table"]		= Color(40,  175, 140);
-	["func"]		= Color(0,	 150, 192);
+	["table"]		= Color(040, 175, 140);
+	["func"]		= Color(000, 150, 192);
 	["etc"]			= Color(189, 195, 199);
 	["unk"]			= Color(255, 255, 255);
+	["com"]			= Color(000, 128, 000);
 };
 
-local function DebugFixToString(a)
+local replacements = {
+	["\n"]	= "\\n";
+	["\r"]	= "\\r";
+	["\v"]	= "\\v";
+	["\f"]	= "\\f";
+	["\x00"]= "\\x00";
+	["\\"]	= "\\\\";
+	["\""]	= "\\\"";
+}
+
+local function DebugFixToStringColored(a, iscom)
 	local _t = type(a);
 	if(_t == "string") then
-		return '"'..string.Replace(string.Replace(a, '"', '\\"'), '\\', '\\\\')..'"';
+		return {typecol.string, '"'..a:gsub(".", replacements)..'"'}; -- took from string.lua
 	elseif(_t == "Vector") then
-		return "Vector("..tostring(a.x)..", "..tostring(a.y)..", "..tostirng(a.z)..")";
+		return {typecol.func, "Vector", typecol.etc, "(", typecol.number, tostring(a.x), typecol.etc, ", "
+			, typecol.number, tostring(a.y), typecol.etc, ", ", typecol.number, tostring(a.z), typecol.etc, ")"};
 	elseif(_t == "Angle") then
-		return "Angle("..tostring(a.p)..", "..tostring(a.y)..", "..tostirng(a.r)..")";
+		return {typecol.func, "Angle", typecol.etc, "(", typecol.number, tostring(a.p), typecol.etc, ", "
+			, typecol.number, tostring(a.y), typecol.etc, ", ", typecol.number, tostring(a.r), typecol.etc, ")"};
 	elseif(_t == "table" and IsColor(a)) then
-		return "Color("..tostring(a.r)..", "..tostring(a.g)..", "..tostring(a.b)..", "..tostring(a.a)..")�";
+		return {typecol.func, "Color", typecol.etc, "(", typecol.number, tostring(a.r), typecol.etc, ", ", typecol.number,
+			tostring(a.g), typecol.etc, ", ", typecol.number, tostring(a.b), typecol.etc, ", ", typecol.number, 
+				tostring(a.a), typecol.etc, ")", typecol.etc, "; ", typecol.com, "-- ", a, "� ", typecol.com, string.format("(0x%02X%02X%02X%02X)", a.r, a.g, a.b, a.a)}, true;
 	elseif(_t == "Player") then
-		return "player.GetByID("..a:EntIndex()..") ["..(a.Nick and a:Nick() or "missing_nick").."]";
-	elseif(_t == "Entity" or regs and regs[_t] and regs[_t].MetaBaseClass and regs[_t].MetaBaseClass.MetaName == "Entity") then
-		return "Entity("..tostring(a:EntIndex())..") ["..(a.GetClass and a:GetClass() or "unknown_class").."]";
+		return {typecol.func, "Player", typecol.etc, "(", typecol.number, tostring(a:UserID()), typecol.etc,
+			")"..(iscom and "; " or ""), typecol.com, (iscom and "-- "..(a:IsValid() and a.Nick and a:Nick() or "missing_nick") or "")}, true;
+	elseif(IsEntity(a)) then
+		return {typecol.func, "Entity", typecol.etc, "(", typecol.number, tostring(a:EntIndex()), typecol.etc,
+			")"..(iscom and "; " or ""), typecol.com, (iscom and "-- "..(a:IsValid() and a.GetClass and a:GetClass() or "unknown_class"))}, true;
 	end
 	if(not typecol[_t]) then
-		return "(".._t..") "..tostring(a);
+		return {typecol.unk, "(".._t..") "..tostring(a)};
 	else
-		return tostring(a);
+		return {typecol[_t], tostring(a)};
 	end
 end
 
-local function DebugFixToStringColored(a)
-	local _t = type(a);
-	if(_t == "string") then
-		return typecol.string, '"'..string.Replace(string.Replace(a, '"', '\\"'), '\\', '\\\\')..'"';
-	elseif(_t == "Vector") then
-		return typecol.func, "Vector", typecol.etc, "(", typecol.number, tostring(a.x), typecol.etc, ", "
-			, typecol.number, tostring(a.y), typecol.etc, ", ", typecol.number, tostring(a.z), typecol.etc, ")";
-	elseif(_t == "Angle") then
-		return typecol.func, "Angle", typecol.etc, "(", typecol.number, tostring(a.p), typecol.etc, ", "
-			, typecol.number, tostring(a.y), typecol.etc, ", ", typecol.number, tostring(a.r), typecol.etc, ")";
-	elseif(_t == "table" and IsColor(a)) then
-		return typecol.func, "Color", typecol.etc, "(", typecol.number, tostring(a.r), typecol.etc, ", ", typecol.number,
-			tostring(a.g), typecol.etc, ", ", typecol.number, tostring(a.b), typecol.etc, ", ", typecol.number, 
-				tostring(a.a), typecol.etc, ")", a, "�";
-	elseif(_t == "Player") then
-		return typecol.func, "player.GetByID", typecol.etc, "(", typecol.number, tostring(a:EntIndex()), typecol.etc,
-			")", typecol.unk, "["..(a.Nick and a:Nick() or "missing_nick").."]";
-	elseif(_t == "Entity" or regs and regs[_t] and regs[_t].MetaBaseClass and regs[_t].MetaBaseClass.MetaName == "Entity") then
-		return typecol.func, "Entity", typecol.etc, "(", typecol.number, tostring(a:EntIndex()), typecol.etc,
-			") ", typecol.unk, "["..(a.GetClass and a:GetClass() or "unknown_class").."]";
+local function DebugFixToString(a, iscom)
+	local ret = "";
+	local rets, osc = DebugFixToStringColored(a);
+	for i = 2, #rets, 2 do
+		ret = ret.. rets[i];
 	end
-	if(not typecol[_t]) then
-		return typecol.unk, "(".._t..") "..tostring(a);
-	else
-		return typecol[_t], tostring(a);
-	end
+	return ret;
 end
 
 --[[
@@ -131,7 +129,8 @@ function DebugPrintTable(tbl, ind, done)
 	local mw = 0;
 	local ws = {};
 	local ind = ind or 0;
-	local done = done or {[tbl] = true};
+	local done = done or {};
+	done[tbl] = true;
 	if(CLIENT) then
 		surface.SetFont("ConsoleText");
 	end
@@ -141,32 +140,27 @@ function DebugPrintTable(tbl, ind, done)
 		ws[#buffer] = GetTextSize(buffer[#buffer]);
 		mw = math.max(ws[#buffer], mw);
 	end
-	local str = "";
-	for i = 1, ind do
-		str = str.." ";
-	end
+	local str = string.rep(" ", ind);
 	if(ind == 0) then MsgN("\n"); end
 	MsgC(typecol.etc, "{\n");
-	local rstr = str;
-	for i = 1, 4 do
-		rstr = rstr.." ";
-	end
+	local rstr = str..string.rep(" ", 4);
+	
 	for i = 1, #buffer do
+		local overridesc = false;
+		local v = rbuf[i];
 		MsgC(typecol.etc, rstr.."[");
-		MsgC(DebugFixToStringColored(rbuf[i]));
-		MsgC(typecol.etc, "] ");
-		Msg(FixTabs(buffer[i], mw));
-		MsgC(typecol.etc, "= ");
-		if(type(tbl[rbuf[i]]) == "table" and not IsColor(tbl[rbuf[i]]) and not done[tbl[rbuf[i]]]) then
-			done[tbl[rbuf[i]]] = true;
-			DebugPrintTable(tbl[rbuf[i]], ind + 4, done);
+		MsgC(unpack((DebugFixToStringColored(v))));
+		MsgC(typecol.etc, "] "..FixTabs(buffer[i], mw), typecol.etc, "= ");
+		if(type(tbl[v]) == "table" and not IsColor(tbl[v]) and not done[tbl[v]]) then
+			DebugPrintTable(tbl[v], ind + 4, done);
 		else
-			local args = {DebugFixToStringColored(tbl[rbuf[i]])};
-			for i = 1, #args, 2 do
-				MsgC(args[i], args[i+1]);
-			end
+			local args, osc = DebugFixToStringColored(tbl[v], true);
+			overridesc = osc;
+			MsgC(unpack(args));
 		end
-		MsgC(typecol.etc, ";");
+		if(not overridesc) then
+			MsgC(typecol.etc, ";");
+		end
 		MsgN("");
 	end
 	MsgC(typecol.etc, str.."}");
