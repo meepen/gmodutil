@@ -30,7 +30,7 @@ local function FixTabs(x, width)
 	while(curw < width) do
 		x 		= x.." ";
 		ret 	= ret.." ";
-		curw 	= GetTextSize(x)
+		curw 	= GetTextSize(x);
 	end
 	return ret
 end
@@ -80,37 +80,37 @@ local replacements = {
 	["\""]	= "\\\"";
 }
 
-local function DebugFixToStringColored(a, iscom)
-	local _t = type(a);
-	if(_t == "string") then
-		return {typecol.string, '"'..a:gsub(".", replacements)..'"'}; -- took from string.lua
-	elseif(_t == "Vector") then
-		return {typecol.func, "Vector", typecol.etc, "(", typecol.number, tostring(a.x), typecol.etc, ", "
-			, typecol.number, tostring(a.y), typecol.etc, ", ", typecol.number, tostring(a.z), typecol.etc, ")"};
-	elseif(_t == "Angle") then
-		return {typecol.func, "Angle", typecol.etc, "(", typecol.number, tostring(a.p), typecol.etc, ", "
-			, typecol.number, tostring(a.y), typecol.etc, ", ", typecol.number, tostring(a.r), typecol.etc, ")"};
-	elseif(_t == "table" and IsColor(a)) then
-		return {typecol.func, "Color", typecol.etc, "(", typecol.number, tostring(a.r), typecol.etc, ", ", typecol.number,
-			tostring(a.g), typecol.etc, ", ", typecol.number, tostring(a.b), typecol.etc, ", ", typecol.number, 
-				tostring(a.a), typecol.etc, ")", typecol.etc, "; ", typecol.com, "-- ", a, "� ", typecol.com, string.format("(0x%02X%02X%02X%02X)", a.r, a.g, a.b, a.a)}, true;
-	elseif(_t == "Player") then
-		return {typecol.func, "Player", typecol.etc, "(", typecol.number, tostring(a:UserID()), typecol.etc,
-			")"..(iscom and "; " or ""), typecol.com, (iscom and "-- "..(a:IsValid() and a.Nick and a:Nick() or "missing_nick") or "")}, true;
-	elseif(IsEntity(a)) then
-		return {typecol.func, "Entity", typecol.etc, "(", typecol.number, tostring(a:EntIndex()), typecol.etc,
-			")"..(iscom and "; " or ""), typecol.com, (iscom and "-- "..(a:IsValid() and a.GetClass and a:GetClass() or "unknown_class"))}, true;
+local function DebugFixToStringColored(obj, iscom)
+	local type = type(obj);
+	if(type == "string") then
+		return {typecol.string, '"'..obj:gsub(".", replacements)..'"'}; -- took from string.lua
+	elseif(type == "Vector") then
+		return {typecol.func, "Vector", typecol.etc, "(", typecol.number, tostring(obj.x), typecol.etc, ", "
+			, typecol.number, tostring(obj.y), typecol.etc, ", ", typecol.number, tostring(obj.z), typecol.etc, ")"};
+	elseif(type == "Angle") then
+		return {typecol.func, "Angle", typecol.etc, "(", typecol.number, tostring(obj.p), typecol.etc, ", "
+			, typecol.number, tostring(obj.y), typecol.etc, ", ", typecol.number, tostring(obj.r), typecol.etc, ")"};
+	elseif(type == "table" and IsColor(obj)) then
+		return {typecol.func, "Color", typecol.etc, "(", typecol.number, tostring(obj.r), typecol.etc, ", ", typecol.number,
+			tostring(obj.g), typecol.etc, ", ", typecol.number, tostring(obj.b), typecol.etc, ", ", typecol.number, 
+				tostring(obj.a), typecol.etc, ")", typecol.etc, "; ", typecol.com, "-- ", obj, "� ", typecol.com, string.format("(0x%02X%02X%02X%02X)", obj.r, obj.g, obj.b, obj.a)}, true;
+	elseif(type == "Player") then
+		return {typecol.func, "Player", typecol.etc, "(", typecol.number, tostring(obj:UserID()), typecol.etc,
+			")"..(iscom and "; " or ""), typecol.com, (iscom and "-- "..(obj:IsValid() and obj.Nick and obj:Nick() or "missing_nick") or "")}, true;
+	elseif(IsEntity(obj)) then
+		return {typecol.func, "Entity", typecol.etc, "(", typecol.number, tostring(obj:EntIndex()), typecol.etc,
+			")"..(iscom and "; " or ""), typecol.com, (iscom and "-- "..(obj:IsValid() and obj.GetClass and obj:GetClass() or "unknown_class"))}, true;
 	end
-	if(not typecol[_t]) then
-		return {typecol.unk, "(".._t..") "..tostring(a)};
+	if(not typecol[type]) then
+		return {typecol.unk, "("..type..") "..tostring(obj)};
 	else
-		return {typecol[_t], tostring(a)};
+		return {typecol[type], tostring(obj)};
 	end
 end
 
-local function DebugFixToString(a, iscom)
+local function DebugFixToString(obj, iscom)
 	local ret = "";
-	local rets, osc = DebugFixToStringColored(a);
+	local rets, osc = DebugFixToStringColored(obj, iscom);
 	for i = 2, #rets, 2 do
 		ret = ret.. rets[i];
 	end
@@ -123,38 +123,37 @@ end
 	Returns: nil
 													]]
 
-function DebugPrintTable(tbl, ind, done)
+function DebugPrintTable(tbl, spaces, done)
 	local buffer = {};
 	local rbuf = {};
-	local mw = 0;
-	local ws = {};
-	local ind = ind or 0;
+	local maxwidth = 0;
+	local spaces = spaces or 0;
 	local done = done or {};
 	done[tbl] = true;
 	if(CLIENT) then
 		surface.SetFont("ConsoleText");
 	end
-	for k,v in pairs(tbl) do
-		rbuf[#rbuf + 1]  = k;
-		buffer[#buffer + 1] = "["..DebugFixToString(k).."] ";
-		ws[#buffer] = GetTextSize(buffer[#buffer]);
-		mw = math.max(ws[#buffer], mw);
+	for key,val in pairs(tbl) do
+		rbuf[#rbuf + 1]  = key;
+		buffer[#buffer + 1] = "["..DebugFixToString(key).."] ";
+		maxwidth = math.max(GetTextSize(buffer[#buffer]), maxwidth);
 	end
-	local str = string.rep(" ", ind);
-	if(ind == 0) then MsgN("\n"); end
+	local str = string.rep(" ", spaces);
+	if(spaces == 0) then MsgN("\n"); end
 	MsgC(typecol.etc, "{\n");
-	local rstr = str..string.rep(" ", 4);
+	local tabbed = str..string.rep(" ", 4);
 	
 	for i = 1, #buffer do
 		local overridesc = false;
-		local v = rbuf[i];
-		MsgC(typecol.etc, rstr.."[");
-		MsgC(unpack((DebugFixToStringColored(v))));
-		MsgC(typecol.etc, "] "..FixTabs(buffer[i], mw), typecol.etc, "= ");
-		if(type(tbl[v]) == "table" and not IsColor(tbl[v]) and not done[tbl[v]]) then
-			DebugPrintTable(tbl[v], ind + 4, done);
+		local key = rbuf[i];
+		local value = tbl[key];
+		MsgC(typecol.etc, tabbed.."[");
+		MsgC(unpack((DebugFixToStringColored(key))));
+		MsgC(typecol.etc, "] "..FixTabs(buffer[i], maxwidth), typecol.etc, "= ");
+		if(type(value) == "table" and not IsColor(value) and not done[value]) then
+			DebugPrintTable(tbl[key], spaces + 4, done);
 		else
-			local args, osc = DebugFixToStringColored(tbl[v], true);
+			local args, osc = DebugFixToStringColored(value, true);
 			overridesc = osc;
 			MsgC(unpack(args));
 		end
@@ -164,7 +163,7 @@ function DebugPrintTable(tbl, ind, done)
 		MsgN("");
 	end
 	MsgC(typecol.etc, str.."}");
-	if(ind == 0) then
+	if(spaces == 0) then
 		MsgN("");
 	end
 end
