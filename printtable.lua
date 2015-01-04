@@ -1,43 +1,40 @@
-include("misc.lua");
-
---[[
+--[[-----------------------------------------------------------------------------
 	Localized variables
 		Reason: prevent looking up variables from the global table every call
-																		]]
+-----------------------------------------------------------------------------]]--
 
 local MsgC = MsgC;
 local type = type;
 
---[[ 
+--[[---------------------------------
 	Make it available Server-side
-	
-								]]
+---------------------------------]]--
 local function GetTextSize(x)
 	if(SERVER) then
-		return string.len(x) * 12;
+		return x:len(), 1;
 	else
 		return surface.GetTextSize(x);
 	end
 end
 
---[[
+--[[-----------------------------------------------------------
 	Do not mess with it unless you know what you are doing!
-																]]
+-----------------------------------------------------------]]--
 
 local function FixTabs(x, width)
 	local curw = GetTextSize(x);
 	local ret = "";
-	while(curw < width) do
+	while(curw < width) do -- not using string.rep since linux
 		x 		= x.." ";
 		ret 	= ret.." ";
 		curw 	= GetTextSize(x);
 	end
-	return ret
+	return ret;
 end
 
---[[
+--[[----------------------------------------------------
 	Font based on default ClientScheme resource file
-														]]
+----------------------------------------------------]]--
 														
 local linux = system.IsLinux();
 local mac	= system.IsOSX();
@@ -52,12 +49,12 @@ if(CLIENT) then
 	});
 end
 
---[[
+--[[---------------------------------------------------------------------
 	Editable Variables:
 		typecol: change and/or add types and colors it prints
 		DebugFixToString: Add or change how it prints things
 		DebugFixToStringColored: Add or change colors/printing styles
-																]]
+---------------------------------------------------------------------]]--
 
 local typecol = {
 	["function"]	= Color(000, 150, 192);
@@ -117,11 +114,11 @@ local function DebugFixToString(obj, iscom)
 	return ret;
 end
 
---[[
+--[[------------------------------------------------------------------------------
 	Function: DebugPrintTable
-	Usage: DebugPrintTable( _IN_ to_print )
+	Usage: DebugPrintTable( _IN_ to_print, _RESERVED_ spaces, _RESERVED_ done)
 	Returns: nil
-													]]
+------------------------------------------------------------------------------]]--
 
 function DebugPrintTable(tbl, spaces, done)
 	local buffer = {};
