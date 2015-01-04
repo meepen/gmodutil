@@ -1,3 +1,9 @@
+local menu = 2;
+local client = 1;
+local server = 0;
+
+local state = MENU_DLL and menu or CLIENT and client or SERVER and server;
+
 --[[-----------------------------------------------------------------------------
 	Localized variables
 		Reason: prevent looking up variables from the global table every call
@@ -57,14 +63,15 @@ end
 ---------------------------------------------------------------------]]--
 
 local typecol = {
-	["function"]	= Color(000, 150, 192);
-	["number"] 		= Color(244, 146, 102);
-	["string"] 		= Color(128, 128, 128);
+	["boolean"]		= Color(0x98, 0x81, 0xF5);
+	["function"]	= Color(0x00, 0xC0, 0xB6);
+	["number"] 		= Color(0xF9, 0xD0, 0x8B);
+	["string"] 		= Color(0xF9, 0x8D, 0x81);
 	["table"]		= Color(040, 175, 140);
-	["func"]		= Color(000, 150, 192);
-	["etc"]			= Color(189, 195, 199);
+	["func"]		= Color(0x82, 0xAF, 0xF9);
+	["etc"]			= Color(0xF0, 0xF0, 0xF0);
 	["unk"]			= Color(255, 255, 255);
-	["com"]			= Color(000, 128, 000);
+	["com"]			= Color(0x00, 0xB0, 0x00);
 };
 
 local replacements = {
@@ -90,11 +97,11 @@ local function DebugFixToStringColored(obj, iscom)
 	elseif(type == "table" and IsColor(obj)) then
 		return {typecol.func, "Color", typecol.etc, "(", typecol.number, tostring(obj.r), typecol.etc, ", ", typecol.number,
 			tostring(obj.g), typecol.etc, ", ", typecol.number, tostring(obj.b), typecol.etc, ", ", typecol.number, 
-				tostring(obj.a), typecol.etc, ")", typecol.etc, "; ", typecol.com, "-- ", obj, "� ", typecol.com, string.format("(0x%02X%02X%02X%02X)", obj.r, obj.g, obj.b, obj.a)}, true;
+				tostring(obj.a), typecol.etc, ")", typecol.etc, "; ", typecol.com, "-- ", obj, "\xE2\x96\x88 ", typecol.com, string.format("(0x%02X%02X%02X%02X)", obj.r, obj.g, obj.b, obj.a)}, true;
 	elseif(type == "Player") then
 		return {typecol.func, "Player", typecol.etc, "(", typecol.number, tostring(obj:UserID()), typecol.etc,
 			")"..(iscom and "; " or ""), typecol.com, (iscom and "-- "..(obj:IsValid() and obj.Nick and obj:Nick() or "missing_nick") or "")}, true;
-	elseif(IsEntity(obj)) then
+	elseif(state ~= menu and IsEntity(obj)) then
 		return {typecol.func, "Entity", typecol.etc, "(", typecol.number, tostring(obj:EntIndex()), typecol.etc,
 			")"..(iscom and "; " or ""), typecol.com, (iscom and "-- "..(obj:IsValid() and obj.GetClass and obj:GetClass() or "unknown_class"))}, true;
 	end

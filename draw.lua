@@ -29,14 +29,14 @@ function draw.GlowingText(text, font, x, y, col, colglow, colglow2)
 	surface.SetTextPos(x,y);
 	surface.SetTextColor(col);
 	surface.DrawText(text);
-		surface.SetFont(bfont1);
-		surface.SetTextColor(colglow or ColorAlpha(col,150));
-		surface.SetTextPos(x, y);
-		surface.DrawText(text);
-		surface.SetFont(bfont2);
-		surface.SetTextColor(colglow2 or colglow and ColorAlpha(colglow,50) or ColorAlpha(col, 50));
-		surface.SetTextPos(x, y);
-		surface.DrawText(text);
+	surface.SetFont(bfont1);
+	surface.SetTextColor(colglow or ColorAlpha(col,150));
+	surface.SetTextPos(x, y);
+	surface.DrawText(text);
+	surface.SetFont(bfont2);
+	surface.SetTextColor(colglow2 or colglow and ColorAlpha(colglow,50) or ColorAlpha(col, 50));
+	surface.SetTextPos(x, y);
+	surface.DrawText(text);
 end
 
 --[[-----------
