@@ -18,14 +18,14 @@ local function type(x)
 	-- network load
 	if(x == 1 or x == 0) then return "bit"; end
 	if(t == "number" and x % 1 == 0) then
-		if(x <= 127 and x >= 127) then
-			return "byte";
+		if(x <= 127 and x >= -127) then
+			return "int8";
 		end
 		if(x <= 0x7FFF and x >= -0x7FFF) then
-			return "word";
+			return "int16";
 		end
 		if(x <= 0x7FFFFFFF and x >= 0x7FFFFFFF) then
-			return "dword";
+			return "int32";
 		end
 	end
 	return t;
@@ -42,9 +42,10 @@ local headers = {
 	Color	= 7;
 	Entity	= 8;
 	bit		= 9;
-	word	= 10;
-	dword	= 11;
-	reference=12;
+	int8	= 10;
+	int16 	= 11;
+	int32	= 12;
+	reference=13;
 };
 local rheader = {};
 for k,v in pairs(headers) do rheader[v] = k; end
@@ -61,13 +62,13 @@ reading = {
 	reference = function(rs)
 		return rs[net.ReadUInt(REFERENCE_BIT)];
 	end,
-	byte = function()
+	int8 = function()
 		return net.ReadInt(8);
 	end,
-	word = function()
+	int16 = function()
 		return net.ReadInt(16);
 	end,
-	dword = function()
+	int32 = function()
 		return net.ReadInt(32);
 	end,
 	string = function()
@@ -138,13 +139,13 @@ writing = {
 	Color = net.WriteColor,
 	boolean = net.WriteBool,
 	number = net.WriteDouble,
-	byte = function(b)
+	int8  = function(b)
 		net.WriteInt(b, 8);
 	end,
-	word = function(w)
+	int16 = function(w)
 		net.WriteInt(w, 16);
 	end,
-	dword = function(d)
+	int32 = function(d)
 		net.WriteInt(d, 32);
 	end,
 	Entity = function(e)
