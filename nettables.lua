@@ -24,7 +24,7 @@ local function type(x)
 		if(x <= 0x7FFF and x >= -0x7FFF) then
 			return "int16";
 		end
-		if(x <= 0x7FFFFFFF and x >= 0x7FFFFFFF) then
+		if(x <= 0x7FFFFFFF and x >= -0x7FFFFFFF) then
 			return "int32";
 		end
 	end
