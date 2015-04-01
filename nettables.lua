@@ -1,8 +1,47 @@
 local should_overwrite = IGNORE_COMPATIBILITY;
 IGNORE_COMPATIBILITY = nil;
 
+local lookup = {}
+for i = ("a"):byte(), ("z"):byte() do
+	table.insert(lookup, string.char(i));
+	lookup[string.char(i)] = #lookup;
+end
+for i = ("A"):byte(), ("Z"):byte() do
+	table.insert(lookup, string.char(i));
+	lookup[string.char(i)] = #lookup;
+end
+for i = ("0"):byte(), ("9"):byte() do
+	table.insert(lookup, string.char(i));
+	lookup[string.char(i)] = #lookup;
+end
+table.insert(lookup, "_");
+lookup["_"] = #lookup;
+table.insert(lookup, " ");
+lookup[" "] = #lookup;
+
+function net.ReadBool()
+
+	return net.ReadBit() == 1
+	
+end
+
+net.WriteBool = net.WriteBit
+
 local function isnormalstring(s)
 	return s:find("[\x80-\xFF%z]") == nil;
+end
+local function isbeststring(s)
+	return s:find("[^a-zA-Z0-9_%s]") == nil;
+end
+
+local function isnan(x)
+	return x ~= x;
+end
+local NAN = {};
+
+local function goodindex(x)
+	if(isnan(x)) then return NAN; end
+	return x;
 end
 
 local reading, writing;
@@ -21,8 +60,8 @@ local function type(x)
 	-- network load
 	if(x == 1 or x == 0) then return "bit" end
 	if(t == "number" and x % 1 == 0 and x >= -0x7FFFFFFF and x <= 0xFFFFFFFF) then
-		if(x <= 127 and x >= -127) then
-			return "int8"
+		if(x <= 127 and x >= 0) then
+			return "uintv"
 		end
 		if(x <= 0x7FFF and x >= -0x7FFF) then
 			return "int16"
@@ -32,8 +71,9 @@ local function type(x)
 		end
 		return "uintv";
 	end
+	if(t == "string" and isbeststring(x)) then return "beststring"; end
 	if(t == "string" and isnormalstring(x)) then return "normalstring"; end
-	return t
+	return t;
 end
 
 local headers = {
@@ -46,8 +86,8 @@ local headers = {
 	Angle    = 6;
 	Color    = 7;
 	Entity   = 8;
-	bit	     = 9;
-	int8     = 10;
+	bit      = 9;
+	beststring=10;
 	int16    = 11;
 	int32    = 12;
 	reference= 13;
@@ -58,14 +98,14 @@ local rheader = {};
 for k,v in pairs(headers) do rheader[v] = k; end
 
 local MAX_BIT = 4; -- max = 15;
-local UINTV_SIZE = 5;
-
+local UINTV_SIZE = 6;
 reading = {
 	uintv = function()
 		local i = 0;
 		local ret = 0;
 		while true do
-			ret = ret + bit.lshift(net.ReadUInt(UINTV_SIZE), i * UINTV_SIZE);
+			local t = net.ReadUInt(UINTV_SIZE);
+			ret = ret + bit.lshift(t, i * UINTV_SIZE);
 			if(not net.ReadBool()) then break; end
 			i = i + 1;
 		end
@@ -90,20 +130,29 @@ reading = {
 	number 		= net.ReadDouble,
 	Entity 		= function()
 		if(net.ReadBool()) then -- non null
-			-- max networked entity index is 2048 according to
-			--https://developer.valvesoftware.com/wiki/Entity_limit
+			-- max networked entity index is 4095 in gmod
 			return Entity(net.ReadUInt(12))
 		end
 		
 		return NULL
 	end,
 	
+	beststring  = function()
+		if(net.ReadBool()) then
+			return util.Decompress(net.ReadData(reading.uintv()));
+		else
+			local ret = "";
+			while true do 
+				local chr = net.ReadUInt(6)
+				if(chr == 0) then return ret; end
+				ret = ret..lookup[chr + 1];
+			end
+		end
+	end,
+	
 	bit 		= net.ReadBit,
 	reference = function(rs)
 		return rs[reading.uintv()];
-	end,
-	int8 = function()
-		return net.ReadInt(8);
 	end,
 	int16 = function()
 		return net.ReadInt(16);
@@ -113,9 +162,9 @@ reading = {
 	end,
 	string = function()
 		if(net.ReadBool()) then -- compressed or not
-			return util.Decompress(net.ReadData(read.uintv()));
+			return util.Decompress(net.ReadData(reading.uintv()));
 		else
-			return net.ReadData(net.ReadUInt(16));
+			return net.ReadData(reading.uintv());
 		end
 	end,
 	Vector = function()
@@ -184,7 +233,7 @@ reading = {
 writing = {
 	uintv = function(n)
 		while(n > 0) do
-			net.WriteUInt(bit.band(n, bit.lshift(1, UINTV_SIZE)), UINTV_SIZE);
+			net.WriteUInt(n, UINTV_SIZE);
 			n = bit.rshift(n, UINTV_SIZE);
 			net.WriteBool(n > 0);
 		end
@@ -205,14 +254,27 @@ writing = {
 			net.WriteUInt(0, 7);
 		end
 	end,
+	
+	beststring = function(s)
+		local compressed = util.Compress(s);
+		local c_len = compressed == nil and 0xFFFFFFFF or #compressed;
+		if(c_len < #s / 8 * 6) then
+			net.WriteBool(true);
+			writing.uintv(c_len);
+			net.WriteData(compressed, c_len);
+		else
+			net.WriteBool(false);
+			for i = 1, s:len() do
+				net.WriteUInt(lookup[s[i]] - 1, 6);
+			end
+			net.WriteUInt(0, 6);
+		end
+	end,
 
 	bit = net.WriteBit,
 	Color = net.WriteColor,
 	boolean = net.WriteBool,
 	number = net.WriteDouble,
-	int8  = function(b)
-		net.WriteInt(b, 8);
-	end,
 	int16 = function(w)
 		net.WriteInt(w, 16);
 	end,
@@ -241,7 +303,7 @@ writing = {
 		local compressed = util.Compress(x);
 		local c_len = compressed == nil and 0xFFFFFFFF or #compressed;
 		local x_len = #x;
-		if(#compressed < x_len) then
+		if(c_len < x_len) then
 			net.WriteBool(true);
 			writing.uintv(c_len);
 			net.WriteData(compressed, c_len);
@@ -279,7 +341,7 @@ writing = {
 					net.WriteUInt(headers[t], MAX_BIT);
 					local _num = writing[t](v, rs, num);
 					if(t ~= "table") then
-						indices[v] = num;
+						indices[goodindex(v)] = num;
 						num = num + 1;
 					else
 						num = _num;
@@ -299,7 +361,7 @@ writing = {
 				net.WriteUInt(headers[t], MAX_BIT);
 				local _num = writing[t](k, rs, num);
 				if(t ~= "table") then
-					indices[k] = num;
+					indices[goodindex(k)] = num;
 					num = num + 1;
 				else
 					num = _num;
@@ -314,7 +376,7 @@ writing = {
 				net.WriteUInt(headers[t], MAX_BIT);
 				local _num = writing[t](v,rs, num);
 				if(t ~= "table") then
-					indices[v] = num;
+					indices[goodindex(v)] = num;
 					num = num + 1;
 				else
 					num = _num;
