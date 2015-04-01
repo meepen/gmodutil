@@ -1,66 +1,106 @@
 local should_overwrite = IGNORE_COMPATIBILITY;
 IGNORE_COMPATIBILITY = nil;
 
-local reading, writing;
+local function isnormalstring(s)
+	return s:find("[\x80-\xFF%z]") == nil;
+end
 
+local reading, writing;
 
 local _type = type;
 local function type(x)
-	local t = _type(x);
+	local t = _type(x)
 	if(t == "table" and IsColor(x)) then
-		return "Color";
+		return "Color"
 	end
 	if(TypeID(x) == TYPE_ENTITY) then
-		return "Entity";
+		return "Entity"
 	end
 	-- since we are forced to above 3 bits in MAX_BIT we are going to add 
 	-- 7 types that will make it decrease
 	-- network load
-	if(x == 1 or x == 0) then return "bit"; end
-	if(t == "number" and x % 1 == 0) then
+	if(x == 1 or x == 0) then return "bit" end
+	if(t == "number" and x % 1 == 0 and x >= -0x7FFFFFFF and x <= 0xFFFFFFFF) then
 		if(x <= 127 and x >= -127) then
-			return "int8";
+			return "int8"
 		end
 		if(x <= 0x7FFF and x >= -0x7FFF) then
-			return "int16";
+			return "int16"
 		end
 		if(x <= 0x7FFFFFFF and x >= -0x7FFFFFFF) then
-			return "int32";
+			return "int32"
 		end
+		return "uintv";
 	end
-	return t;
+	if(t == "string" and isnormalstring(x)) then return "normalstring"; end
+	return t
 end
 
 local headers = {
-	string 	= 0;
-	number 	= 1;
-	table 	= 2;
-	boolean	= 3;
-	endtable= 4;
-	Vector	= 5;
-	Angle	= 6;
-	Color	= 7;
-	Entity	= 8;
-	bit		= 9;
-	int8	= 10;
-	int16 	= 11;
-	int32	= 12;
-	reference=13;
+	string   = 0;
+	number   = 1;
+	table    = 2;
+	boolean  = 3;
+	endtable = 4;
+	Vector   = 5;
+	Angle    = 6;
+	Color    = 7;
+	Entity   = 8;
+	bit	     = 9;
+	int8     = 10;
+	int16    = 11;
+	int32    = 12;
+	reference= 13;
+	uintv    = 14;
+	normalstring = 15;
 };
 local rheader = {};
 for k,v in pairs(headers) do rheader[v] = k; end
 
 local MAX_BIT = 4; -- max = 15;
-local REFERENCE_BIT = 12;
+local UINTV_SIZE = 5;
 
 reading = {
+	uintv = function()
+		local i = 0;
+		local ret = 0;
+		while true do
+			ret = ret + bit.lshift(net.ReadUInt(UINTV_SIZE), i * UINTV_SIZE);
+			if(not net.ReadBool()) then break; end
+			i = i + 1;
+		end
+		return ret;
+	end,
+	
+	normalstring = function()
+		if(net.ReadBool()) then
+			return util.Decompress(net.ReadData(reader.uintv()));
+		else
+			local ret = "";
+			while true do 
+				local chr = net.ReadUInt(7)
+				if(chr == 0) then return ret; end
+				ret = ret..string.char(chr);
+			end
+		end
+	end,
+
 	Color 		= net.ReadColor,
 	boolean 	= net.ReadBool,
 	number 		= net.ReadDouble,
-	Entity 		= net.ReadEntity,
+	Entity 		= function()
+		if(net.ReadBool()) then -- non null
+			-- max networked entity index is 2048 according to
+			--https://developer.valvesoftware.com/wiki/Entity_limit
+			return Entity(net.ReadUInt(12))
+		end
+		
+		return NULL
+	end,
+	
 	bit 		= net.ReadBit,
 	reference = function(rs)
-		return rs[net.ReadUInt(REFERENCE_BIT)];
+		return rs[reading.uintv()];
 	end,
 	int8 = function()
 		return net.ReadInt(8);
@@ -73,7 +113,7 @@ reading = {
 	end,
 	string = function()
 		if(net.ReadBool()) then -- compressed or not
-			return util.Decompress(net.ReadData(net.ReadUInt(16)));
+			return util.Decompress(net.ReadData(read.uintv()));
 		else
 			return net.ReadData(net.ReadUInt(16));
 		end
@@ -86,11 +126,18 @@ reading = {
 	end,
 	table = function(references)
 		local ret = {};
-		local references = references or {};
+		local references = references or {
+			"__index",
+			"__newindex",
+			"self",
+			"MetaName",
+			"MetaType",
+			"type",
+		};
 		references[#references + 1] = ret;
 		local num = #references + 1;
 		if(net.ReadBool()) then -- indices start at 1 and
-			local max = net.ReadUInt(16); -- go to max
+			local max = reading.uintv(); -- go to max
 			for i = 1, max do
 				local type = net.ReadUInt(MAX_BIT);
 				local v = reading[rheader[type]](references);
@@ -135,6 +182,30 @@ reading = {
 
 
 writing = {
+	uintv = function(n)
+		while(n > 0) do
+			net.WriteUInt(bit.band(n, bit.lshift(1, UINTV_SIZE)), UINTV_SIZE);
+			n = bit.rshift(n, UINTV_SIZE);
+			net.WriteBool(n > 0);
+		end
+	end,
+	
+	normalstring = function(s)
+		local compressed = util.Compress(s);
+		local c_len = compressed == nil and 0xFFFFFFFF or #compressed;
+		if(c_len < #s / 8 * 7) then
+			net.WriteBool(true);
+			writing.uintv(c_len);
+			net.WriteData(compressed, c_len);
+		else
+			net.WriteBool(false);
+			for i = 1, s:len() do
+				net.WriteUInt(s[i]:byte(), 7);
+			end
+			net.WriteUInt(0, 7);
+		end
+	end,
+
 	bit = net.WriteBit,
 	Color = net.WriteColor,
 	boolean = net.WriteBool,
@@ -168,33 +239,41 @@ writing = {
 	end,
 	string = function(x)
 		local compressed = util.Compress(x);
-		if(#compressed < #x) then
+		local c_len = compressed == nil and 0xFFFFFFFF or #compressed;
+		local x_len = #x;
+		if(#compressed < x_len) then
 			net.WriteBool(true);
-			local len = bit.band(#compressed, 0x7FFF);
-			net.WriteUInt(len, 16);
-			net.WriteData(compressed, len);
+			writing.uintv(c_len);
+			net.WriteData(compressed, c_len);
 		else -- we are doing this for zero embedded strings
 			net.WriteBool(false);
-			local len = bit.band(#x, 0x7FFF);
-			net.WriteUInt(len, 16);
-			net.WriteData(x, len);
+			writing.uintv(x_len);
+			net.WriteData(x, x_len);
 		end
 	end,
 	table = function(tbl, indices, num)
 		local done = {};
 		num = num or 1;
-		local indices = indices or {};
+		local indices = indices or {
+			__index = 1;
+			__newindex = 2;
+			self = 3,
+			MetaName = 4,
+			MetaType = 5,
+			type = 6,
+		};
 		indices[tbl] = num;
 		num = num + 1;
-		if(#tbl ~= 0) then
+		local t_len = #tbl;
+		if(t_len ~= 0) then
 			net.WriteBool(true);
-			net.WriteUInt(#tbl, 16);
-			for i = 1, #tbl do
+			writing.uintv(t_len);
+			for i = 1, t_len do
 				done[i] = true;
 				local v = tbl[i];
 				if(indices[v]) then
 					net.WriteUInt(headers.reference, MAX_BIT);
-					net.WriteUInt(indices[v], REFERENCE_BIT);
+					writing.uintv(indices[v]);
 				else
 					local t = type(v);
 					net.WriteUInt(headers[t], MAX_BIT);
@@ -214,7 +293,7 @@ writing = {
 			if(done[k]) then continue; end
 			if(indices[k]) then
 				net.WriteUInt(headers.reference, MAX_BIT);
-				net.WriteUInt(indices[k], REFERENCE_BIT);
+				writing.uintv(indices[k]);
 			else
 				local t = type(k);
 				net.WriteUInt(headers[t], MAX_BIT);
@@ -229,7 +308,7 @@ writing = {
 			
 			if(indices[v]) then
 				net.WriteUInt(headers.reference, MAX_BIT);
-				net.WriteUInt(indices[v], REFERENCE_BIT);
+				writing.uintv(indices[v]);
 			else
 				local t = type(v);
 				net.WriteUInt(headers[t], MAX_BIT);
@@ -249,7 +328,3 @@ writing = {
 
 net.NWriteTable = writing.table;
 net.NReadTable = reading.table;
-if(should_overwrite) then
-	net.WriteTable = writing.table;
-	net.ReadTable = reading.table;
-end
