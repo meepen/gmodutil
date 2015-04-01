@@ -19,14 +19,6 @@ lookup["_"] = #lookup;
 table.insert(lookup, " ");
 lookup[" "] = #lookup;
 
-function net.ReadBool()
-
-	return net.ReadBit() == 1
-	
-end
-
-net.WriteBool = net.WriteBit
-
 local function isnormalstring(s)
 	return s:find("[\x80-\xFF%z]") == nil;
 end
