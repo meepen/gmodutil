@@ -390,3 +390,7 @@ writing = {
 
 net.NWriteTable = writing.table;
 net.NReadTable = reading.table;
+if(should_overwrite) then
+	net.WriteTable = net.NWriteTable;
+	net.ReadTable = net.NReadTable;
+end
