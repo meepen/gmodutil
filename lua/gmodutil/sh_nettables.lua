@@ -78,14 +78,11 @@ local function IsHexaString( str )
     
 end
 
-
 --
 -- Returns true if the argument is NaN ( can also be interpreted as 0/0 )
 --
 local function IsNaN( x )
-
     return x ~= x
-	
 end
 
 --
@@ -95,13 +92,11 @@ local NaN = {}
 
 --
 -- This exists because you can't make a table index NaN
--- We need to do this so we can cache it in our reference table
+-- We need to do this so we can cache it in our references table
 --
-local function NaNToReference( x )
-
+local function IndexSafe( x )
     if( IsNaN( x ) ) then return NaN end
     return x
-	
 end
 
 local reading, writing
@@ -185,29 +180,23 @@ do
 	}
 	
 	for k,v in pairs( StringToTypeLookup ) do 
-	
 		TypeToStringLookup[ v ] = k
-		
 	end
+	
 end
 
 local function TypeToString( n )
-
 	return TypeToStringLookup[ n ]
-	
 end
 
 local function StringToType( s )
-
 	return StringToTypeLookup[ s ]
-	
 end
 
 local ReferenceType = StringToType( "reference" )
 local TableType     = StringToType( "table" )
 
 reading = {
-
 	-- 
 	-- Normal gmod types we can't really improve
 	--
@@ -216,14 +205,12 @@ reading = {
     number      = net.ReadDouble,
     bit         = net.ReadBit,
 	
-	
 	--
 	-- Entity
 	-- CClientEntityList::GetMaxEntityIndex( ) returns 8096
 	-- valve developer wiki says 1/2 are static, non networkable
 	-- therefore we are going to use 12 bits to send the index
 	--
-
     Entity = function( )
 	
         if( net.ReadBool( ) ) then -- non null
@@ -238,9 +225,7 @@ reading = {
 	-- A reference index in our already-sent-table
 	-- 
     reference = function( rs )
-	
         return rs[ reading.uintv( ) ]
-		
     end,
 
 	--
@@ -263,20 +248,19 @@ reading = {
 	-- NULL terminated
 	--
     string7 = function( )
-	
         if( net.ReadBool( ) ) then
             return util.Decompress( net.ReadData( reader.uintv( ) ) )
         else
-		
             local ret = ""
-            while true do 
+			
+            while true do
+			
                 local chr = net.ReadUInt( 7 )
                 if( chr == 0 ) then return ret end
                 ret = ret..string.char( chr )
+				
             end
-			
         end
-		
     end,
 	
 	--
@@ -284,7 +268,6 @@ reading = {
 	-- NULL terminated
 	--
     hexastring = function( )
-	
         if( net.ReadBool( ) ) then
             return util.Decompress( net.ReadData( reading.uintv( ) ) )
         else
@@ -319,13 +302,11 @@ reading = {
 	-- not null terminated
 	--
     string = function( )
-	
         if( net.ReadBool( ) ) then -- compressed or not
             return util.Decompress( net.ReadData( reading.uintv( ) ) )
         else
             return net.ReadData( reading.uintv( ) )
         end
-		
     end,
 	
 	--
@@ -344,7 +325,6 @@ reading = {
 	-- Angle, we are using our own wrapper since 
 	-- default net.WriteAngle loses lots of precision
 	--
-	
     Angle = function( )
         return Angle( net.ReadFloat( ), net.ReadFloat( ), net.ReadFloat( ) )
     end,
@@ -357,14 +337,7 @@ reading = {
         local ret = { }
 		
 		-- our default reference list
-        local references = references or {
-            "__index",
-            "__newindex",
-            "self",
-            "MetaName",
-            "MetaType",
-            "type",
-        }
+        local references = references or { }
 		
         references[ #references + 1 ] = ret
         local num = #references + 1
@@ -384,10 +357,8 @@ reading = {
                     if( type == TableType ) then
                         num = #references + 1
                     else
-					
                         references[ num ] = v
                         num = num + 1
-						
                     end
 					
                 end
@@ -398,7 +369,7 @@ reading = {
         end
 		
 		--
-		-- Make sure we infinite loop
+		-- Make sure we don't infinite loop
 		--
         for i = 1, 8096 do
 		
@@ -407,7 +378,6 @@ reading = {
 			--
 			-- Check if it's a real value
 			--
-			
             if( TypeToString( type ) == "endtable" ) then break end
             local k = reading[ TypeToString( type ) ]( references ) 
 			
@@ -517,9 +487,6 @@ writing = {
 	
 	--
 	-- Entity
-	-- CClientEntityList::GetMaxEntityIndex( ) returns 8096
-	-- valve developer wiki says 1/2 are static, non networkable
-	-- therefore we are going to use 12 bits to send the index
 	--
     Entity = function( e )
 	
@@ -553,11 +520,9 @@ writing = {
 	-- default net.WriteAngle loses lots of precision
 	--
     Angle = function( a )
-	
         net.WriteFloat( a.p )
         net.WriteFloat( a.y )
         net.WriteFloat( a.r )
-		
     end,
 	
 	--
@@ -585,7 +550,6 @@ writing = {
             net.WriteData( x, x_len )
 			
         end
-		
     end,
 	
 	--
@@ -601,15 +565,7 @@ writing = {
         num = num or 1
 		
 		-- our already-sent data
-        local indices = indices or {
-            __index = 1,
-            __newindex = 2,
-            self = 3,
-            MetaName = 4,
-            MetaType = 5,
-            type = 6,
-        }
-		
+        local indices = indices or { }
 		
         indices[ tbl ] = num
 		
@@ -641,11 +597,10 @@ writing = {
 					
                     if( t ~= "table" ) then
 					
-                        indices[ NaNToReference( v ) ] = num
+                        indices[ IndexSafe( v ) ] = num
                         num = num + 1
 						
-                    else
-						-- dont store the table in our references since writetable does it for us
+                    else -- dont store the table in our references since writetable does it for us
                         num = _num
                     end
 					
@@ -673,20 +628,17 @@ writing = {
                 local _num = writing[ t ]( k, rs, num )
 				
                 if( t ~= "table" ) then
-                    indices[ NaNToReference( k ) ] = num
+                    indices[ IndexSafe( k ) ] = num
                     num = num + 1
-                else
-					-- dont store our reference since writetable does that for us
+                else -- dont store our reference since writetable does that for us
                     num = _num
                 end
 				
             end
             
             if( indices[ v ] ) then
-			
                 net.WriteUInt( ReferenceType, TYPE_SIZE )
                 writing.uintv( indices[ v ] )
-				
             else
 			
                 local t = SendType( v )
@@ -695,7 +647,7 @@ writing = {
                 local _num = writing[ t ]( v, rs, num )
 				
                 if( t ~= "table" ) then
-                    indices[ NaNToReference( v ) ] = num
+                    indices[ IndexSafe( v ) ] = num
                     num = num + 1
                 else
                     num = _num

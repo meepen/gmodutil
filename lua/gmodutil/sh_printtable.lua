@@ -23,6 +23,19 @@ local function GetTextSize(x)
 	end
 end
 
+--[[-------------------------------
+	Make a good version of type
+-------------------------------]]--
+
+local function PrintType(x)
+	if(IsColor(x)) then return "Color"; end
+	if(TypeID(x) == TYPE_ENTITY) then 
+		if(x:IsPlayer()) then return "Player"; end
+		return "Entity";
+	end
+	return type(x);
+end
+
 --[[-----------------------------------------------------------
 	Do not mess with it unless you know what you are doing!
 -----------------------------------------------------------]]--
@@ -63,15 +76,15 @@ end
 ---------------------------------------------------------------------]]--
 
 local typecol = {
-	["boolean"]		= Color(0x98, 0x81, 0xF5);
-	["function"]	= Color(0x00, 0xC0, 0xB6);
-	["number"] 		= Color(0xF9, 0xD0, 0x8B);
-	["string"] 		= Color(0xF9, 0x8D, 0x81);
-	["table"]		= Color(040, 175, 140);
-	["func"]		= Color(0x82, 0xAF, 0xF9);
-	["etc"]			= Color(0xF0, 0xF0, 0xF0);
-	["unk"]			= Color(255, 255, 255);
-	["com"]			= Color(0x00, 0xB0, 0x00);
+	boolean         = Color(0x98, 0x81, 0xF5);
+	["function"]    = Color(0x00, 0xC0, 0xB6);
+	number          = Color(0xF9, 0xD0, 0x8B);
+	string          = Color(0xF9, 0x8D, 0x81);
+	table           = Color(040, 175, 140);
+	func            = Color(0x82, 0xAF, 0xF9);
+	etc             = Color(0xF0, 0xF0, 0xF0);
+	unk             = Color(255, 255, 255);
+	com             = Color(0x00, 0xB0, 0x00);
 };
 
 local replacements = {
@@ -84,26 +97,33 @@ local replacements = {
 	["\""]	= "\\\"";
 }
 
-local function DebugFixToStringColored(obj, iscom)
-	local type = type(obj);
-	if(type == "string") then
+local ConversionLookupTable = {
+	string = function(obj, iscom)
 		return {typecol.string, '"'..obj:gsub(".", replacements)..'"'}; -- took from string.lua
-	elseif(type == "Vector") then
-		return {typecol.func, "Vector", typecol.etc, "(", typecol.number, tostring(obj.x), typecol.etc, ", "
-			, typecol.number, tostring(obj.y), typecol.etc, ", ", typecol.number, tostring(obj.z), typecol.etc, ")"};
-	elseif(type == "Angle") then
-		return {typecol.func, "Angle", typecol.etc, "(", typecol.number, tostring(obj.p), typecol.etc, ", "
-			, typecol.number, tostring(obj.y), typecol.etc, ", ", typecol.number, tostring(obj.r), typecol.etc, ")"};
-	elseif(type == "table" and IsColor(obj)) then
+	end,
+	Vector = function(obj, iscom)
+		return {typecol.func, "Vector", typecol.etc, "(", typecol.number, tostring(obj.x), typecol.etc, ", ",
+			typecol.number, tostring(obj.y), typecol.etc, ", ", typecol.number, tostring(obj.z), typecol.etc, ")"};
+	end,
+	Angle = function(obj, iscom)
+		return {typecol.func, "Angle", typecol.etc, "(", typecol.number, tostring(obj.p), typecol.etc, ", ",
+			typecol.number, tostring(obj.y), typecol.etc, ", ", typecol.number, tostring(obj.r), typecol.etc, ")"};
+	end,
+	Color = function(obj, iscom)
 		return {typecol.func, "Color", typecol.etc, "(", typecol.number, tostring(obj.r), typecol.etc, ", ", typecol.number,
 			tostring(obj.g), typecol.etc, ", ", typecol.number, tostring(obj.b), typecol.etc, ", ", typecol.number, 
 				tostring(obj.a), typecol.etc, ")", typecol.etc, "; ", typecol.com, "-- ", obj, "\xE2\x96\x88 ", typecol.com, string.format("(0x%02X%02X%02X%02X)", obj.r, obj.g, obj.b, obj.a)}, true;
-	elseif(type == "Player") then
+	end,
+	Player = function(obj, iscom)
 		return {typecol.func, "Player", typecol.etc, "(", typecol.number, tostring(obj:UserID()), typecol.etc,
 			")"..(iscom and "; " or ""), typecol.com, (iscom and "-- "..(obj:IsValid() and obj.Nick and obj:Nick() or "missing_nick") or "")}, true;
-	elseif(state ~= menu and IsEntity(obj)) then
-		return {typecol.func, "Entity", typecol.etc, "(", typecol.number, tostring(obj:EntIndex()), typecol.etc,
-			")"..(iscom and "; " or ""), typecol.com, (iscom and "-- "..(obj:IsValid() and obj.GetClass and obj:GetClass() or "unknown_class"))}, true;
+	end,
+};
+
+local function DebugFixToStringColored(obj, iscom)
+	local type = PrintType(obj);
+	if(ConversionLookupTable[type]) then
+		return ConversionLookupTable[type](obj, iscom);
 	end
 	if(not typecol[type]) then
 		return {typecol.unk, "("..type..") "..tostring(obj)};
@@ -164,10 +184,10 @@ function DebugPrintTable(tbl, spaces, done)
 		if(not overridesc) then
 			MsgC(typecol.etc, ";");
 		end
-		MsgN("");
+		MsgN"";
 	end
 	MsgC(typecol.etc, str.."}");
 	if(spaces == 0) then
-		MsgN("");
+		MsgN"";
 	end
 end
