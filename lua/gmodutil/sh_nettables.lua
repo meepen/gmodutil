@@ -16,11 +16,10 @@ do
         { "a", "z" },
         { "A", "Z" },
         { "0", "9" },
-		{ "_", "_" },
-		{ " ", " " }
+		{ "_", "_" }
     }
     
-    local offset = 0
+    local offset = 1
     
     for k, v in ipairs( HexaRanges ) do
     
@@ -38,7 +37,7 @@ do
         offset = offset + 1 + eChar - sChar
     
     end
-    
+	
 end
 
 --
@@ -65,7 +64,7 @@ end
 --
 local function Is7BitString( str )
 
-    return str:find( "[ \x80-\xFF%z ]" ) == nil
+    return str:find( "[\x80-\xFF%z]" ) == nil
     
 end
 
@@ -74,7 +73,7 @@ end
 --
 local function IsHexaString( str )
 
-    return str:find( "[ ^a-zA-Z0-9_ ]" ) == nil
+    return str:find( "[^a-zA-Z0-9_]" ) == nil
     
 end
 
@@ -214,7 +213,7 @@ reading = {
     Entity = function( )
 	
         if( net.ReadBool( ) ) then -- non null
-            return Entity( net.ReadUInt( 12 ) )
+            return Entity( net.ReadUInt( 13 ) )
         end
         
         return NULL
@@ -249,7 +248,7 @@ reading = {
 	--
     string7 = function( )
         if( net.ReadBool( ) ) then
-            return util.Decompress( net.ReadData( reader.uintv( ) ) )
+            return util.Decompress( net.ReadData( reading.uintv( ) ) )
         else
             local ret = ""
 			
@@ -493,7 +492,7 @@ writing = {
         if( (IsValid( e ) or game.GetWorld( ) == e) and e:EntIndex( ) < 4096 ) then
 		
             net.WriteBool( true )
-            net.WriteUInt( e:EntIndex( ), 12 )
+            net.WriteUInt( e:EntIndex( ), 13 )
 			
             return
 			
