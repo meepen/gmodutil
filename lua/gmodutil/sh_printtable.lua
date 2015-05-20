@@ -1,9 +1,3 @@
-local menu = 2;
-local client = 1;
-local server = 0;
-
-local state = MENU_DLL and menu or CLIENT and client or SERVER and server;
-
 --[[-----------------------------------------------------------------------------
 	Localized variables
 		Reason: prevent looking up variables from the global table every call
@@ -60,7 +54,7 @@ local mac	= system.IsOSX();
 local win	= system.IsWindows();
 
 
-if(CLIENT) then
+if(not SERVER) then
 	surface.CreateFont("ConsoleText", {
 		font	= ((linux or mac) and "Verdana" or "Lucida Console");
 		size	= (mac and 11 or linux and 14 or 10);
@@ -154,7 +148,7 @@ function DebugPrintTable(tbl, spaces, done)
 	local spaces = spaces or 0;
 	local done = done or {};
 	done[tbl] = true;
-	if(CLIENT) then
+	if(not SERVER) then
 		surface.SetFont("ConsoleText");
 	end
 	for key,val in pairs(tbl) do
